@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Mate Bot</title>
+    <!-- Link to our CSS file -->
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="font-inter bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="chat-container bg-white rounded-lg shadow-xl overflow-hidden w-full max-w-md flex flex-col">
+        <header class="chat-header bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 text-center rounded-t-lg shadow-md">
+            <h1 class="text-2xl font-bold">Study Mate Bot</h1>
+            <p class="text-sm opacity-90">Your AI-powered study assistant</p>
+        </header>
+
+        <main class="chat-box flex-grow p-4 overflow-y-auto space-y-4">
+            <!-- Chat messages will be appended here -->
+            <div class="message bot-message">
+                <p>Hello! I'm your Study Mate. How can I help you with your studies today?</p>
+            </div>
+        </main>
+
+        <div class="chat-input-container p-4 border-t border-gray-200 bg-gray-50">
+            <div class="flex space-x-3">
+                <input type="text" id="user-input" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ask me anything about your studies...">
+                <button id="send-button" class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-md transition duration-200">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.querySelector('.chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+
+        let chatHistory = []; // Stores conversation history for context
+
+        // Function to add a message to the chat box
+        function addMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', `${sender}-message`);
+            messageDiv.innerHTML = `<p>${message}</p>`;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
+        }
+
+        // Function to send message to backend
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
+
+            addMessage('user', message);
+            userInput.value = ''; // Clear input field
+
+            // Add user message to history for the next turn
+            chatHistory.push({ role: "user", parts: message });
+
+            // Show typing indicator
+            const typingIndicator = document.createElement('div');
+            typingIndicator.classList.add('message', 'bot-message', 'typing-indicator');
+            typingIndicator.innerHTML = '<p>Study Mate🤖 is thinking 🤔 please wait ✨...</p>';
+            chatBox.appendChild(typingIndicator);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message, chat_history: chatHistory })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const botResponse = data.response;
+
+                // Remove typing indicator
+                chatBox.removeChild(typingIndicator);
+
+                addMessage('bot', botResponse);
+                // Add bot response to history
+                chatHistory.push({ role: "model", parts: botResponse });
+
+            } catch (error) {
+                console.error('Error:', error);
+                // Remove typing indicator if error occurs
+                if (chatBox.contains(typingIndicator)) {
+                    chatBox.removeChild(typingIndicator);
+                }
+                addMessage('bot', 'Sorry, Im having trouble connecting right now. Please try again later.');
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
